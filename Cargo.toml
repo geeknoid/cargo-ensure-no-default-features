@@ -1,6 +1,6 @@
 [package]
 name = "cargo-ensure-no-default-features"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Ensures a workspace's Cargo.toml file always uses default-features = false for all dependencies"
 license-file = "LICENSE"
@@ -9,7 +9,7 @@ homepage = "https://github.com/geeknoid/cargo-ensure-no-default-features"
 keywords = ["cargo", "ci", "testing", "automation"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
-rust-version = "1.91"
+rust-version = "1.88"
 
 [dependencies]
 anyhow = { version = "1.0.100", default-features = false }

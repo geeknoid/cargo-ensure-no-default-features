@@ -4,7 +4,7 @@
 [![docs.rs](https://docs.rs/cargo-ensure-no-default-features/badge.svg)](https://docs.rs/cargo-ensure-no-default-features)
 [![CI](https://github.com/geeknoid/cargo-ensure-no-default-features/workflows/main/badge.svg)](https://github.com/geeknoid/cargo-ensure-no-default-features/actions)
 [![Coverage](https://codecov.io/gh/geeknoid/cargo-ensure-no-default-features/graph/badge.svg?token=FCUG0EL5TI)](https://codecov.io/gh/geeknoid/cargo-ensure-no-default-features)
-[![Minimum Supported Rust Version 1.91](https://img.shields.io/badge/MSRV-1.91-blue.svg)]()
+[![Minimum Supported Rust Version 1.88](https://img.shields.io/badge/MSRV-1.88-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 <!-- cargo-rdme start -->
