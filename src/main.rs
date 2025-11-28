@@ -5,7 +5,7 @@
 //! This tool checks that all workspace dependencies in Cargo.toml have
 //! `default-features = false`. This is a best practice in repos that publish multiple independent
 //! crates, to ensure that each individual crate has the minimal set of features they need.
-//! This helps improve build times for any consumers of these crates by avoiding
+//! This can improve build times for any consumers of these crates by avoiding
 //! unnecessary features being enabled by default.
 //!
 //! Install with:
@@ -19,6 +19,13 @@
 //! ```bash
 //! cargo ensure-no-default-features
 //! ```
+//!
+//! The --manifest-path option lets you specify an explicit Cargo.toml file to check. Without this
+//! option, it defaults to the Cargo.toml in the current directory.
+//!
+//! The --exceptions option lets you specify a comma-separated list of dependencies to exclude from
+//! the default-features check. This is useful for dependencies that you explicitly want to have
+//! default features enabled.
 
 mod validation;
 
@@ -41,8 +48,12 @@ enum Commands {
     /// Ensure all workspace dependencies have default-features = false
     EnsureNoDefaultFeatures {
         /// Path to Cargo.toml
-        #[arg(long, default_value = "Cargo.toml")]
+        #[arg(long, default_value = "Cargo.toml", value_name = "PATH")]
         manifest_path: PathBuf,
+
+        /// List of dependencies to exclude from default-features check
+        #[arg(long, short = 'e', value_delimiter = ',')]
+        exceptions: Option<Vec<String>>,
     },
 }
 
@@ -51,25 +62,29 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::EnsureNoDefaultFeatures { manifest_path } => {
-            let cargo_toml_path = manifest_path;
-            let content =
-                std::fs::read_to_string(&cargo_toml_path).with_context(|| format!("Failed to read {}", cargo_toml_path.display()))?;
+        Commands::EnsureNoDefaultFeatures { manifest_path, exceptions } => {
+            let content = std::fs::read_to_string(&manifest_path).with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+            let exceptions = exceptions.unwrap_or_default();
 
-            let errors = validate_workspace_dependencies(&content)?;
-
+            let (errors, found_deps) = validate_workspace_dependencies(&content, &exceptions)?;
             if !errors.is_empty() {
-                eprintln!("❌ Found dependencies without default-features = false:\n");
+                eprintln!("❌ Found {} dependencies without default-features = false:\n", errors.len());
                 for error in &errors {
                     eprintln!("{error}");
                 }
-                eprintln!("\nAll workspace dependencies must have default-features = false.");
-                eprintln!("Individual crates can enable features they need in their own Cargo.toml.");
-                eprintln!("\nFound {} dependency validation error(s)", errors.len());
                 std::process::exit(1);
             }
-            println!("✅ All workspace dependencies have default-features = false");
+
+            // Warn if any exception was not found in the dependencies
+            for exception in &exceptions {
+                if !found_deps.contains(exception) {
+                    eprintln!("⚠️ Warning: exception '{exception}' was not found in [workspace.dependencies]");
+                }
+            }
+
+            println!("✅ All required workspace dependencies have default-features = false");
         }
     }
+
     Ok(())
 }
