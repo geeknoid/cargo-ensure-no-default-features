@@ -49,7 +49,7 @@ anyhow = { version = "1.0", default-features = false }
 
     assert!(output.status.success(), "Command should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("✅ All workspace dependencies have default-features = false"));
+    assert!(stdout.contains("✅ All required workspace dependencies have default-features = false"));
 }
 
 #[test]
@@ -170,7 +170,7 @@ clap = { version = "4.0", default-features = true }
     assert!(stderr.contains("'serde'"));
     assert!(stderr.contains("'regex'"));
     assert!(stderr.contains("'clap'"));
-    assert!(stderr.contains("Found 3 dependency validation error(s)"));
+    assert!(stderr.contains("Found 3 dependencies without default-features = false"));
 }
 
 #[test]
@@ -242,7 +242,7 @@ members = ["crate1"]
 
     assert!(output.status.success(), "Command should succeed with empty dependencies");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("✅ All workspace dependencies have default-features = false"));
+    assert!(stdout.contains("✅ All required workspace dependencies have default-features = false"));
 }
 
 #[test]
@@ -370,6 +370,8 @@ serde = { version = "1.0", default-features = false }
         .expect("Failed to execute command");
 
     assert!(output.status.success(), "Command should succeed with default manifest path");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("✅ All required workspace dependencies have default-features = false"));
 }
 
 #[test]
@@ -393,4 +395,100 @@ serde = { version = "1.0", default-features = false, optional = true }
         .expect("Failed to execute command");
 
     assert!(output.status.success(), "Command should succeed with optional dependency");
+}
+
+#[test]
+fn test_exception_not_found_warning() {
+    // Test that warning is generated when exception is specified but not found in dependencies
+    let content = r#"
+[workspace]
+members = ["crate1"]
+
+[workspace.dependencies]
+serde = { version = "1.0", default-features = false }
+tokio = { version = "1.0", default-features = false }
+"#;
+
+    let temp_dir = create_test_manifest(content);
+    let manifest_path = temp_dir.path().join("Cargo.toml");
+
+    let output = Command::new(get_binary_path())
+        .arg("ensure-no-default-features")
+        .arg("--manifest-path")
+        .arg(&manifest_path)
+        .arg("--exceptions")
+        .arg("nonexistent-dep")
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success(), "Command should succeed");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("⚠️ Warning: exception 'nonexistent-dep' was not found in [workspace.dependencies]"));
+}
+
+#[test]
+fn test_exception_found_no_warning() {
+    // Test that warning is NOT generated when exception is found in dependencies
+    let content = r#"
+[workspace]
+members = ["crate1"]
+
+[workspace.dependencies]
+serde = { version = "1.0", default-features = false }
+tokio = "1.0"
+"#;
+
+    let temp_dir = create_test_manifest(content);
+    let manifest_path = temp_dir.path().join("Cargo.toml");
+
+    let output = Command::new(get_binary_path())
+        .arg("ensure-no-default-features")
+        .arg("--manifest-path")
+        .arg(&manifest_path)
+        .arg("--exceptions")
+        .arg("tokio")
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success(), "Command should succeed");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Verify NO warning is generated since 'tokio' exists in dependencies
+    assert!(!stderr.contains("⚠️ Warning: exception 'tokio' was not found in [workspace.dependencies]"));
+}
+
+#[test]
+fn test_multiple_exceptions_mixed() {
+    // Test with multiple exceptions - some found, some not found
+    let content = r#"
+[workspace]
+members = ["crate1"]
+
+[workspace.dependencies]
+serde = { version = "1.0", default-features = false }
+tokio = "1.0"
+anyhow = { version = "1.0" }
+"#;
+
+    let temp_dir = create_test_manifest(content);
+    let manifest_path = temp_dir.path().join("Cargo.toml");
+
+    let output = Command::new(get_binary_path())
+        .arg("ensure-no-default-features")
+        .arg("--manifest-path")
+        .arg(&manifest_path)
+        .arg("--exceptions")
+        .arg("tokio,anyhow,nonexistent1,nonexistent2")
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success(), "Command should succeed");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should have warnings for the nonexistent exceptions
+    assert!(stderr.contains("⚠️ Warning: exception 'nonexistent1' was not found in [workspace.dependencies]"));
+    assert!(stderr.contains("⚠️ Warning: exception 'nonexistent2' was not found in [workspace.dependencies]"));
+
+    // Should NOT have warnings for the found exceptions
+    assert!(!stderr.contains("⚠️ Warning: exception 'tokio' was not found in [workspace.dependencies]"));
+    assert!(!stderr.contains("⚠️ Warning: exception 'anyhow' was not found in [workspace.dependencies]"));
 }
