@@ -9,7 +9,7 @@ on:
       - v[0-9]+.*
 
 jobs:
-  create-release:
+  create-draft-release:
     runs-on: ubuntu-latest
     environment: release
     steps:
@@ -18,9 +18,10 @@ jobs:
         with:
           changelog: CHANGELOG.md
           token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
 
   upload-assets:
-    needs: [create-release]
+    needs: [create-draft-release]
     environment: release
     strategy:
       matrix:
@@ -40,9 +41,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           target: ${{ matrix.target }}
 
+  finalize-release:
+    runs-on: ubuntu-latest
+    needs: [upload-assets]
+    environment: release
+    steps:
+      - uses: actions/checkout@v6
+      - uses: taiki-e/finalize-gh-release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+
   publish-crate:
     runs-on: ubuntu-latest
-    needs: [create-release]
+    needs: [finalize-release]
     permissions:
       id-token: write
     steps:
